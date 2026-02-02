@@ -1,14 +1,16 @@
 pipeline {
   agent any
-  
-environment {
-  AWS_REGION = "ap-south-1"
-  AWS_ACCOUNT_ID = "176713589590"
-  ECR_REPO = "python-eks-app"
-  IMAGE_TAG = "latest"
-}
+
+  environment {
+    AWS_REGION     = "ap-south-1"
+    AWS_ACCOUNT_ID = "176713589590"
+    ECR_REPO       = "python-eks-app"
+    IMAGE_NAME     = "python-app"
+    IMAGE_TAG      = "latest"
+  }
 
   stages {
+
     stage('Checkout') {
       steps {
         checkout scm
@@ -17,16 +19,36 @@ environment {
 
     stage('Build Docker Image') {
       steps {
-        sh 'docker build -t python-jenkins-test .'
+        sh '''
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+        '''
       }
     }
 
-    stage('Run Container Test') {
+    stage('Login to AWS ECR') {
       steps {
         sh '''
-          docker run -d -p 5001:5000 --name python-test python-jenkins-test
-          sleep 5
-          curl http://localhost:5001
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+        '''
+      }
+    }
+
+    stage('Tag Image for ECR') {
+      steps {
+        sh '''
+          docker tag $IMAGE_NAME:$IMAGE_TAG \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+        '''
+      }
+    }
+
+    stage('Push Image to ECR') {
+      steps {
+        sh '''
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
         '''
       }
     }
@@ -34,7 +56,7 @@ environment {
 
   post {
     always {
-      sh 'docker rm -f python-test || true'
+      sh 'docker logout || true'
     }
   }
 }
