@@ -1,5 +1,12 @@
 pipeline {
   agent any
+  
+environment {
+  AWS_REGION = "ap-south-1"
+  AWS_ACCOUNT_ID = "176713589590"
+  ECR_REPO = "python-eks-app"
+  IMAGE_TAG = "latest"
+}
 
   stages {
     stage('Checkout') {
